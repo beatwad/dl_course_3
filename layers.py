@@ -179,13 +179,18 @@ class ConvolutionalLayer:
             np.random.randn(filter_size, filter_size,
                             in_channels, out_channels)
         )
-
         self.B = Param(np.zeros(out_channels))
-
+        self.X = None
         self.padding = padding
 
     def forward(self, X):
+        self.X = X
         batch_size, height, width, channels = X.shape
+        # padding of X with zeroes
+        if self.padding > 0:
+            pad_X = np.zeros((batch_size, height+2*self.padding, width+2*self.padding, channels))
+            pad_X[:, self.padding:X.shape[0] + self.padding, self.padding:X.shape[1] + self.padding, :] = X
+            self.X = pad_X
 
         out_height = (height - self.filter_size + 2*self.padding) + 1
         out_width = (width - self.filter_size + 2*self.padding) + 1
@@ -196,8 +201,8 @@ class ConvolutionalLayer:
 
         for y in range(out_height):
             for x in range(out_width):
-                inp = X[:, (y-self.filter_size):(y+self.filter_size),
-                           (x-self.filter_size):(x+self.filter_size), :].reshape(batch_size, 1, -1)
+                inp = self.X[:, (y-self.filter_size):(y+self.filter_size),
+                                (x-self.filter_size):(x+self.filter_size), :].reshape(batch_size, 1, -1)
                 prediction[:, y, x, :] = (np.tensordot(inp, W, axes=([2], [0])) + B)[:, 0, :]
         return prediction
 
@@ -207,6 +212,9 @@ class ConvolutionalLayer:
         # when you implemented FullyConnectedLayer
         # Just do it the same number of times and accumulate gradients
 
+        X = self.X
+        W = self.params()['W'].value.reshape(-1, self.out_channels)
+        filter_size = self.filter_size
         batch_size, height, width, channels = X.shape
         _, out_height, out_width, out_channels = d_out.shape
 
@@ -215,18 +223,30 @@ class ConvolutionalLayer:
         # aggregate input gradient and fill them for every location
         # of the output
 
+        dresult = np.zeros((batch_size, height, width, channels))
+        dW = np.zeros((filter_size, filter_size, channels, out_channels))
+        dB = np.zeros(out_channels)
+
         # Try to avoid having any other loops here too
         for y in range(out_height):
             for x in range(out_width):
-                # TODO: Implement backward pass for specific location
-                # Aggregate gradients for both the input and
-                # the parameters (W and B)
-                pass
+                inp = X[(y-self.filter_size):(y+self.filter_size),
+                        (x-self.filter_size):(x+self.filter_size)].reshape(batch_size, 1, -1)
+                d_X = np.dot(d_out[:, y, x, :], W.T).reshape((batch_size, filter_size, filter_size, channels))
+                dresult[:, (y-self.filter_size):(y+self.filter_size),
+                           (x-self.filter_size):(x+self.filter_size), :] += d_X
+                d_W = np.tensordot(inp.T, d_out[:, y, x, :], axes=([2], [0])).reshape((filter_size, filter_size,
+                                                                                       channels, out_channels))
+                dW += d_W
+                d_B = np.dot(np.ones((1, d_out[:, y, x, :].shape[0])), d_out[:, y, x, :]).reshape(out_channels)
+                dB += d_B
 
-        raise Exception("Not implemented!")
+        self.params()['W'].grad += dW
+        self.params()['B'].grad += dB
+        return dresult
 
     def params(self):
-        return { 'W': self.W, 'B': self.B }
+        return {'W': self.W, 'B': self.B}
 
 
 class MaxPoolingLayer:
