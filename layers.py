@@ -189,60 +189,49 @@ class ConvolutionalLayer:
         # padding of X with zeroes
         if self.padding > 0:
             pad_X = np.zeros((batch_size, height+2*self.padding, width+2*self.padding, channels))
-            pad_X[:, self.padding:X.shape[0] + self.padding, self.padding:X.shape[1] + self.padding, :] = X
+            pad_X[:, self.padding:X.shape[0]+self.padding, self.padding:X.shape[1]+self.padding, :] = X
             self.X = pad_X
-
-        out_height = (height - self.filter_size + 2*self.padding) + 1
-        out_width = (width - self.filter_size + 2*self.padding) + 1
+        # calculate output height ant width
+        out_height = (height-self.filter_size+2*self.padding)+1
+        out_width = (width-self.filter_size+2*self.padding)+1
         prediction = (np.zeros((batch_size, out_height, out_width, self.out_channels)))
-
+        # get weight and bias parameters, reshape weight parameter to 2D array
         W = self.params()['W'].value.reshape(-1, self.out_channels)
         B = self.params()['B'].value
-
+        # calculate forward path
         for y in range(out_height):
             for x in range(out_width):
-                inp = self.X[:, (y-self.filter_size):(y+self.filter_size),
-                                (x-self.filter_size):(x+self.filter_size), :].reshape(batch_size, 1, -1)
+                inp = self.X[:, y:(y+self.filter_size), x:(x+self.filter_size), :].reshape(batch_size, 1, -1)
                 prediction[:, y, x, :] = (np.tensordot(inp, W, axes=([2], [0])) + B)[:, 0, :]
         return prediction
 
     def backward(self, d_out):
-        # Hint: Forward pass was reduced to matrix multiply
-        # You already know how to backprop through that
-        # when you implemented FullyConnectedLayer
-        # Just do it the same number of times and accumulate gradients
-
         X = self.X
+        # get weight parameter, reshape weight parameter to 2D array
         W = self.params()['W'].value.reshape(-1, self.out_channels)
         filter_size = self.filter_size
         batch_size, height, width, channels = X.shape
         _, out_height, out_width, out_channels = d_out.shape
-
-        # TODO: Implement backward pass
-        # Same as forward, setup variables of the right shape that
-        # aggregate input gradient and fill them for every location
-        # of the output
-
+        # prepare variables for gradients
         dresult = np.zeros((batch_size, height, width, channels))
         dW = np.zeros((filter_size, filter_size, channels, out_channels))
         dB = np.zeros(out_channels)
-
-        # Try to avoid having any other loops here too
+        # calculate back path
         for y in range(out_height):
             for x in range(out_width):
-                inp = X[(y-self.filter_size):(y+self.filter_size),
-                        (x-self.filter_size):(x+self.filter_size)].reshape(batch_size, 1, -1)
+                inp = X[:, y:(y+self.filter_size), x:(x+self.filter_size), :].reshape(batch_size, 1, -1)
                 d_X = np.dot(d_out[:, y, x, :], W.T).reshape((batch_size, filter_size, filter_size, channels))
-                dresult[:, (y-self.filter_size):(y+self.filter_size),
-                           (x-self.filter_size):(x+self.filter_size), :] += d_X
+                dresult[:, y:(y+self.filter_size), x:(x+self.filter_size), :] += d_X
                 d_W = np.tensordot(inp.T, d_out[:, y, x, :], axes=([2], [0])).reshape((filter_size, filter_size,
                                                                                        channels, out_channels))
                 dW += d_W
                 d_B = np.dot(np.ones((1, d_out[:, y, x, :].shape[0])), d_out[:, y, x, :]).reshape(out_channels)
                 dB += d_B
-
+        # update parameters
         self.params()['W'].grad += dW
         self.params()['B'].grad += dB
+        dresult = dresult[:, self.padding:dresult.shape[1]-self.padding,
+                          self.padding:dresult.shape[2]-self.padding, :]
         return dresult
 
     def params(self):
