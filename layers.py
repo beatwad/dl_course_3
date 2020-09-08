@@ -253,15 +253,31 @@ class MaxPoolingLayer:
 
     def forward(self, X):
         batch_size, height, width, channels = X.shape
-        # TODO: Implement maxpool forward pass
-        # Hint: Similarly to Conv layer, loop on
-        # output x/y dimension
-        raise Exception("Not implemented!")
+        self.X = np.zeros_like(X)
+        out_height = int((height - self.pool_size)/self.stride + 1)
+        out_width = int((width - self.pool_size)/self.stride + 1)
+        result = np.zeros((batch_size, out_height, out_width, channels))
+        for b in range(batch_size):
+            for c in range(channels):
+                for y in range(0, height, self.stride):
+                    for x in range(0, width, self.stride):
+                        inp = X[b, y:(y+self.pool_size), x:(x+self.pool_size), c]
+                        max_ind = np.unravel_index(np.argmax(inp), inp.shape)
+                        self.X[b, y+max_ind[0], x+max_ind[1], c] = 1
+                        result[b, int(y/self.stride), int(x/self.stride), c] = inp[max_ind]
+        return result
 
     def backward(self, d_out):
-        # TODO: Implement maxpool backward pass
+        dresult = np.zeros_like(self.X)
         batch_size, height, width, channels = self.X.shape
-        raise Exception("Not implemented!")
+        for b in range(batch_size):
+            for c in range(channels):
+                for y in range(0, height, self.stride):
+                    for x in range(0, width, self.stride):
+                        out = self.X[b, y:(y+self.pool_size), x:(x+self.pool_size), c]
+                        max_ind = np.unravel_index(np.argmax(out), out.shape)
+                        dresult[b, y+max_ind[0], x+max_ind[1], c] = d_out[b, int(y/self.stride), int(x/self.stride), c]
+        return dresult
 
     def params(self):
         return {}
