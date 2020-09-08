@@ -189,7 +189,7 @@ class ConvolutionalLayer:
         # padding of X with zeroes
         if self.padding > 0:
             pad_X = np.zeros((batch_size, height+2*self.padding, width+2*self.padding, channels))
-            pad_X[:, self.padding:X.shape[0]+self.padding, self.padding:X.shape[1]+self.padding, :] = X
+            pad_X[:, self.padding:X.shape[1]+self.padding, self.padding:X.shape[2]+self.padding, :] = X
             self.X = pad_X
         # calculate output height ant width
         out_height = (height-self.filter_size+2*self.padding)+1
@@ -289,15 +289,13 @@ class Flattener:
 
     def forward(self, X):
         batch_size, height, width, channels = X.shape
-
-        # TODO: Implement forward pass
-        # Layer should return array with dimensions
-        # [batch_size, hight*width*channels]
-        raise Exception("Not implemented!")
+        self.X_shape = batch_size, height, width, channels
+        result = X.reshape((batch_size, height*width*channels))
+        return result
 
     def backward(self, d_out):
-        # TODO: Implement backward pass
-        raise Exception("Not implemented!")
+        dresult = d_out.reshape(self.X_shape)
+        return dresult
 
     def params(self):
         # No params!
