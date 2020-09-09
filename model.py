@@ -42,7 +42,7 @@ class ConvNet:
         self.maxpool2 = MaxPoolingLayer(4, 4)
 
         self.flattener = Flattener()
-        self.fc_layer = FullyConnectedLayer(self.conv2_channels, self.n_output_classes)
+        self.fc_layer = FullyConnectedLayer(2*2*self.conv2_channels, self.n_output_classes)
 
     def compute_loss_and_gradients(self, X, y):
         """
@@ -61,8 +61,8 @@ class ConvNet:
         self.params()['W2'].grad = np.zeros((3, 3, self.conv1_channels, self.conv2_channels))
         self.params()['B2'].grad = np.zeros(self.conv2_channels)
         # FC Layer
-        self.params()['W3'].grad = np.zeros((self.conv2_channels, self.n_output_classes))
-        self.params()['B3'].grad = np.zeros(self.n_output_classes)
+        self.params()['W3'].grad = np.zeros((2*2*self.conv2_channels, self.n_output_classes))
+        self.params()['B3'].grad = np.zeros((1, self.n_output_classes))
 
         # forward conv layer 1
         conv_forward1 = self.conv1_layer.forward(X)
@@ -80,11 +80,6 @@ class ConvNet:
 
         # forward flattener layer
         flattener_forward = self.flattener.forward(maxpool_forward2)
-        # calculate flattener output data shape and create FC layer
-        batch_size, height, width, channels = self.flattener.X_shape
-        self.fc_layer = FullyConnectedLayer(height*width*channels, self.n_output_classes)
-        self.params()['W3'].grad = np.zeros((height*width*channels, self.n_output_classes))
-        self.params()['B3'].grad = np.zeros((1, self.n_output_classes))
         # forward FC layer
         fc_forward = self.fc_layer.forward(flattener_forward)
 
@@ -128,11 +123,6 @@ class ConvNet:
 
         # forward flattener layer
         flattener_forward = self.flattener.forward(maxpool_forward2)
-        # calculate flattener output data shape and create FC layer
-        batch_size, height, width, channels = self.flattener.X_shape
-        self.fc_layer = FullyConnectedLayer(height * width * channels, self.n_output_classes)
-        self.params()['W3'].grad = np.zeros((height * width * channels, self.n_output_classes))
-        self.params()['B3'].grad = np.zeros((1, self.n_output_classes))
         # forward FC layer
         fc_forward = self.fc_layer.forward(flattener_forward)
         # make prediction
